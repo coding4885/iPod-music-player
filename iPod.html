@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPod Wheel Improved</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#cfcfcf">
+
+<style>
+body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#111;
+    font-family:Arial,sans-serif;
+    touch-action:none;
+}
+.ipod{
+    width:320px;
+    height:560px;
+    background:linear-gradient(#f5f5f5,#dcdcdc);
+    border-radius:40px;
+    padding:22px;
+    box-shadow:0 30px 40px rgba(0,0,0,.6);
+}
+.screen{
+    height:160px;
+    background:linear-gradient(#b7d9b0,#8fbf8a);
+    border-radius:8px;
+    border:3px solid #6e8f6a;
+    padding:10px;
+    box-shadow:inset 0 0 6px #567;
+}
+.status{
+    font-weight:bold;
+    font-size:12px;
+    margin-bottom:6px;
+}
+.track{
+    font-size:13px;
+    word-break:break-all;
+}
+.wheel{
+    margin:30px auto 0;
+    width:240px;
+    height:240px;
+    background:radial-gradient(#eee,#cfcfcf);
+    border-radius:50%;
+    position:relative;
+    box-shadow:inset 0 0 10px #aaa;
+}
+.label{
+    position:absolute;
+    font-weight:bold;
+    user-select:none;
+}
+.menu{top:12px;left:50%;transform:translateX(-50%);}
+.play{bottom:12px;left:50%;transform:translateX(-50%);}
+.prev{left:14px;top:50%;transform:translateY(-50%);}
+.next{right:14px;top:50%;transform:translateY(-50%);}
+.center{
+    width:80px;
+    height:80px;
+    background:radial-gradient(#ddd,#bbb);
+    border-radius:50%;
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    box-shadow:inset 0 0 6px #999;
+}
+#fileInput{display:none;}
+</style>
+</head>
+
+<body>
+<div class="ipod">
+    <div class="screen">
+        <div class="status" id="status">MENU</div>
+        <div class="track" id="track">Add Songs</div>
+    </div>
+
+    <div class="wheel" id="wheel">
+        <div class="label menu" id="menuBtn">MENU</div>
+        <div class="label play">▶❙❙</div>
+        <div class="label prev">⏮</div>
+        <div class="label next">⏭</div>
+        <div class="center" id="centerBtn"></div>
+    </div>
+
+    <input type="file" id="fileInput" accept="audio/*" multiple>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+const wheel = document.getElementById("wheel");
+const centerBtn = document.getElementById("centerBtn");
+const menuBtn = document.getElementById("menuBtn");
+const fileInput = document.getElementById("fileInput");
+const audio = document.getElementById("audio");
+const status = document.getElementById("status");
+const track = document.getElementById("track");
+
+let playlist = [];
+let currentIndex = 0;
+let previewIndex = 0;
+let isPreview = false;
+
+// 🔧 휠 감도 핵심 변수
+let lastY = null;
+let accumulated = 0;
+const SCROLL_THRESHOLD = 120; // ← 이 값이 “얼마나 오래 돌려야” 기준
+
+menuBtn.onclick = () => {
+    status.textContent = "MENU";
+    track.textContent = "Add Songs";
+};
+
+centerBtn.onclick = () => {
+    if (!playlist.length) {
+        fileInput.click();
+        return;
+    }
+
+    if (isPreview) {
+        currentIndex = previewIndex;
+        playCurrent();
+        isPreview = false;
+    } else {
+        audio.paused ? audio.play() : audio.pause();
+        status.textContent = "PLAYING";
+    }
+};
+
+fileInput.onchange = () => {
+    playlist = [...fileInput.files];
+    currentIndex = 0;
+    playCurrent();
+};
+
+function playCurrent(){
+    audio.src = URL.createObjectURL(playlist[currentIndex]);
+    audio.play();
+    status.textContent = "PLAYING";
+    track.textContent = playlist[currentIndex].name;
+}
+
+/* 🌀 개선된 휠 로직 */
+wheel.addEventListener("pointermove", e => {
+    if (lastY === null) {
+        lastY = e.clientY;
+        return;
+    }
+
+    const diff = e.clientY - lastY;
+    accumulated += diff;
+    lastY = e.clientY;
+
+    if (Math.abs(accumulated) >= SCROLL_THRESHOLD && playlist.length) {
+        previewIndex = accumulated > 0
+            ? (previewIndex + 1) % playlist.length
+            : (previewIndex - 1 + playlist.length) % playlist.length;
+
+        status.textContent = "PREVIEW";
+        track.textContent = playlist[previewIndex].name;
+        isPreview = true;
+
+        accumulated = 0; // ⭐ 한 칸 이동 후 리셋
+    }
+});
+
+wheel.addEventListener("pointerup", () => {
+    lastY = null;
+    accumulated = 0;
+});
+
+audio.addEventListener("ended", () => {
+    currentIndex = (currentIndex + 1) % playlist.length;
+    playCurrent();
+});
+</script>
+</body>
+</html>
